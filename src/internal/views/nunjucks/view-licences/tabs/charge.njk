@@ -42,6 +42,14 @@
   </div>
 {% endmacro %}
 
+
+{% macro agreementDescription (agreement) %}
+  {{ agreement.agreement.description | default(agreement.agreement.code) }}
+  {% if agreement.purposeUses %}
+  <br>{{ agreement.purposeUses }}
+  {% endif %}
+{% endmacro %}
+
 {% macro agreementRowMobile(agreement, isChargingUser) %}
   <div class="phone--show">
     <hr class="govuk-section-break govuk-section-break--m govuk-section-break--visible">
@@ -51,7 +59,7 @@
     <p>End date:
       {{ agreement.dateRange.endDate | date }}</p>
     <p>Agreement:
-      {{ agreement.agreement.description | default(agreement.agreement.code) }}</p>
+      {{ agreementDescription(agreement) }}</p>
     <p>Date signed:
       {{ agreement.dateSigned | date }}</p>
     <p>Action:
@@ -89,7 +97,7 @@
       {{ agreement.dateRange.endDate | date }}
     </td>
     <td class="govuk-table__cell">
-      {{ agreement.agreement.description | default(agreement.agreement.code) }}
+      {{ agreementDescription(agreement) }}
     </td>
     <td class="govuk-table__cell">
       {{ agreement.dateSigned | date }}

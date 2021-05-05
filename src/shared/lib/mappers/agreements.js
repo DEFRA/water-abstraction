@@ -11,5 +11,14 @@ const mapAgreement = agreement => ({
   description: agreementDescriptions[agreement.code]
 });
 
+const mapLicenceAgreementPurposeUse = licenceAgreementPurposeUse =>
+  licenceAgreementPurposeUse.purposeUse.name;
+
+const mapLicenceAgreementPurposeUses = licenceAgreementPurposeUses => {
+  const purposeUseNames = licenceAgreementPurposeUses.map(mapLicenceAgreementPurposeUse);
+  return purposeUseNames.join(', ');
+};
+
 exports.agreementDescriptions = agreementDescriptions;
 exports.mapAgreement = mapAgreement;
+exports.mapLicenceAgreementPurposeUses = mapLicenceAgreementPurposeUses;

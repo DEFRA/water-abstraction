@@ -91,7 +91,8 @@ const hasMultiplePages = pagination => pagination.pageCount > 1;
 
 const mapLicenceAgreement = licenceAgreement => ({
   ...licenceAgreement,
-  agreement: agreementMapper.mapAgreement(licenceAgreement.agreement)
+  agreement: agreementMapper.mapAgreement(licenceAgreement.agreement),
+  purposeUses: agreementMapper.mapLicenceAgreementPurposeUses(licenceAgreement.licenceAgreementPurposeUses)
 });
 
 /**
