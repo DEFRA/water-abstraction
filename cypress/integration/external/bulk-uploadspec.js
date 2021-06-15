@@ -1,16 +1,17 @@
+import 'cypress-file-upload';
 const { setUp, tearDown } = require('../../support/setup');
 
-describe('User Login and Log out', () => {
+describe('Bulk upload returns test', () => {
   before(() => {
     tearDown();
-    setUp('barebones');
+    setUp('bulk-return');
   });
 
   after(() => {
     tearDown();
   });
 
-  it('User login and logout', () => {
+  it('User bulk upload test', () => {
     //  cy.visit to visit the URL
     cy.visit(Cypress.env('USER_URI'));
 
@@ -28,11 +29,26 @@ describe('User Login and Log out', () => {
 
     //  assert once the user is signed in
     cy.contains('Add licences or give access');
+    cy.contains('AT/CURR/DAILY/01').should('be.visible');
+    cy.contains('AT/CURR/WEEKLY/01').should('be.visible');
+    cy.contains('AT/CURR/MONTHLY/01').should('be.visible');
+    cy.contains('AT/CURR/MONTHLY/02').should('be.visible');
 
-    //  Click Sign out Button
-    cy.get('#signout').click();
+    cy.get(':nth-child(2) > h2.licence-result__column > a').contains('AT/CURR/DAILY/01').click();
+    cy.get('#navbar-returns').click();
+    cy.get('p > a').click();
 
-    //  assert the signout
-    cy.contains('You are signed out').should('be.visible');
+    cy.window().document().then(function (doc) {
+      doc.addEventListener('click', () => {
+        setTimeout(function () { doc.location.reload(); }, 5000);
+      });
+      cy.get('.govuk-list > :nth-child(1) > a').click();
+      // cy.readFile(downloadFolder);
+    });
+    cy.get('.govuk-grid-column-two-thirds > .govuk-button').click();
+    // cy.get('#file').dblclick();
+    const filepath = '/downloads/big farm co ltd monthly return';
+    cy.get('input[type="file"]').attachFile(filepath);
+    cy.get('button.govuk-button').click();
   });
 });
