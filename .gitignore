@@ -14,3 +14,4 @@ jsconfig.json
 /cypress/videos/
 /cypress/screenshots/
 /cypress/reports/
+.zip
