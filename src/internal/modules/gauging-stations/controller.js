@@ -245,6 +245,120 @@ const getFlowComplete = (request, h) => {
   });
 };
 
+const getRemoveTags = async (request, h) => {
+  const pageTitle = 'Which licence do you want to remove a tag from?';
+  const caption = await helpers.getCaption(request);
+  const { licenceGaugingStations } = request.pre;
+  const { data } = licenceGaugingStations;
+
+  /* Used in second step for Multiple tags */
+  session.merge(request, {
+    licenceGaugingStations: data
+  });
+
+  return h.view('nunjucks/form', {
+    ...request.view,
+    caption,
+    pageTitle,
+    form: formHandler.handleFormRequest(request, linkageForms.removeTags), /* Generates deduplicated list */
+    sessionData: session.get(request)
+  });
+};
+
+const postRemoveTagOrMultiple = async (request, h) => {
+  const form = await formHandler.handleFormRequest(request, linkageForms.removeTagsMultiple);
+
+  if (!form.isValid) {
+    return h.postRedirectGet(form);
+  }
+
+  let tagsForLicence = [];
+  const selectedLicenceRadio = form.fields.find(field => field.name === 'selectedLicence');
+  const sessionData = session.merge(request, {
+    selectedLicence: selectedLicenceRadio,
+    selectedCondition: [] /* clear selection */
+  });
+
+  if (selectedLicenceRadio) {
+    tagsForLicence = sessionData.licenceGaugingStations.filter(item => item.licenceId === selectedLicenceRadio.value);
+  }
+
+  if (tagsForLicence.length > 1) {
+    return h.redirect(request.path.replace(/\/[^/]*$/, '/remove-tag-multiple'));
+  }
+
+  return h.redirect(request.path.replace(/\/[^/]*$/, '/remove-tag-complete'));
+};
+
+const getRemoveMultipleTagsCheckbox = async (request, h) => {
+  const pageTitle = 'This licence has more than one tag, select the ones you need to remove';
+  const caption = await helpers.getCaption(request);
+
+  const sessionData = session.merge(request, {
+    selectedCondition: [] /* clear selection */
+  });
+
+  return h.view('nunjucks/form', {
+    ...request.view,
+    caption,
+    pageTitle,
+    form: formHandler.handleFormRequest(request, linkageForms.removeTagsMultipleCheckbox),
+    sessionData
+  });
+};
+
+const postRemoveTagsMultiple = async (request, h) => {
+  const form = await formHandler.handleFormRequest(request, linkageForms.removeTagsMultipleCheckbox);
+
+  if (!form.isValid) {
+    return h.postRedirectGet(form);
+  }
+
+  const formCheckBox = await formHandler.handleFormRequest(request, linkageForms.removeTagsMultipleCheckbox);
+  const selectedCondition = formCheckBox.fields.find(field => field.name === 'selectedCondition');
+
+  session.merge(request, {
+    selectedCondition: selectedCondition
+  });
+
+  return h.redirect(request.path.replace(/\/[^/]*$/, '/remove-tag-complete'));
+};
+
+const getRemoveTagComplete = async (request, h) => {
+  const pageTitle = 'You are about to remove tags from this licence';
+  const caption = await helpers.getCaption(request);
+
+  const formCheckBox = await formHandler.handleFormRequest(request, linkageForms.removeTagsMultipleCheckbox);
+  const selectedCondition = formCheckBox.fields.find(field => field.name === 'selectedCondition');
+
+  if (selectedCondition.options.choices.length > 1) {
+    const selectedConditionWithLinkages = helpers.selectedConditionWithLinkages(request);
+    session.merge(request, {
+      selectedConditionWithLinkages
+    });
+  } else {
+    const form = await formHandler.handleFormRequest(request, linkageForms.removeTagsMultiple);
+    const selectedLicenceRadio = form.fields.find(field => field.name === 'selectedLicence');
+    session.merge(request, {
+      selectedConditionWithLinkages: [],
+      selectedLicence: selectedLicenceRadio
+    });
+  }
+
+  return h.view('nunjucks/gauging-stations/remove-tag-complete', {
+    ...request.view,
+    caption,
+    pageTitle,
+    form: formHandler.handleFormRequest(request, linkageForms.removeTagComplete),
+    sessionData: session.get(request)
+  });
+};
+
+const postRemoveTagComplete = async (request, h) => {
+  await helpers.handleRemovePost(request);
+  return h.redirect(request.path.replace(/\/untagging-licence\/[^/]*$/, '/'));
+};
+
 exports.getNewFlow = getNewFlow;
 exports.getThresholdAndUnit = getThresholdAndUnit;
 exports.postThresholdAndUnit = postThresholdAndUnit;
@@ -260,3 +374,9 @@ exports.getCheckYourAnswers = getCheckYourAnswers;
 exports.postCheckYourAnswers = postCheckYourAnswers;
 exports.getFlowComplete = getFlowComplete;
 exports.getMonitoringStation = getMonitoringStation;
+exports.getRemoveTags = getRemoveTags;
+exports.getRemoveTagComplete = getRemoveTagComplete;
+exports.postRemoveTagOrMultiple = postRemoveTagOrMultiple;
+exports.postRemoveTagComplete = postRemoveTagComplete;
+exports.postRemoveTagsMultiple = postRemoveTagsMultiple;
+exports.getRemoveMultipleTagsCheckbox = getRemoveMultipleTagsCheckbox;

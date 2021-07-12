@@ -98,6 +98,7 @@ const groupByLicence = inputArray => {
 const handlePost = async request => {
   const { gaugingStationId } = request.params;
   const sessionData = session.get(request);
+
   const { id: licenceId } = sessionData.fetchedLicence;
   const storedLicenceVersionPurposeConditionIdFromSession = get(sessionData, 'condition.value', null);
   const licenceVersionPurposeConditionId = storedLicenceVersionPurposeConditionIdFromSession === blankGuid ? null : storedLicenceVersionPurposeConditionIdFromSession;
@@ -136,6 +137,126 @@ const handlePost = async request => {
   return services.water.gaugingStations.postLicenceLinkage(gaugingStationId, licenceId, set(parsedPayload, 'licenceVersionPurposeConditionId', null));
 };
 
+const handleRemovePost = async request => {
+  const sessionData = session.get(request);
+  let promises = [];
+  if (sessionData.selectedCondition) {
+    if (sessionData.selectedCondition.value) {
+      sessionData.selectedLicence = null;
+      const selectArr = sessionData.selectedCondition.value;
+      promises = selectArr.map(licenceGaugingStationId => services.water.gaugingStations.postLicenceLinkageRemove(licenceGaugingStationId));
+    }
+  } else if (sessionData.selectedLicence && sessionData.selectedLicence.value) {
+    const arrayOfLicenceGaugingStationsRecords = sessionData.selectedLicence.options.choices;
+    promises = arrayOfLicenceGaugingStationsRecords.map(row => services.water.gaugingStations.postLicenceLinkageRemove(row.licenceGaugingStationId));
+  }
+  return Promise.all(promises);
+};
+
+const humaniseAlertType = str => {
+  str = str.replace('stop_or_reduce', 'Reduce');
+  str = str.replace('stop', 'Stop');
+  str = str.replace('reduce', 'Reduce');
+  return str;
+};
+
+const humaniseUnits = str => {
+  str = str.replace('gal', 'Gallons');
+  str = str.replace('Ml', 'Megalitres');
+  str = str.replace('m³', 'Cubic metres');
+  str = str.replace('l/', 'Litres/');
+  str = str.replace('/d', ' per day');
+  return str;
+};
+
+const detailedLabel = (labelData, licenceRef, dupeNum) => {
+  const labelItem = labelData.filter(item => item.licenceRef === licenceRef)[dupeNum - 1];
+  return ` ${humaniseAlertType(labelItem.alertType)} at ${labelItem.thresholdValue} ${humaniseUnits(labelItem.thresholdUnit)}`;
+};
+
+const selectedConditionWithLinkages = request => {
+  const { licenceGaugingStations } = request.pre;
+  const { data } = licenceGaugingStations;
+  const isSelectedCheckbox = (licenceGaugingStationId, selectionArray) =>
+    selectionArray.filter(chkItem => chkItem === licenceGaugingStationId).length > 0;
+
+  const dataFormatted = data.map(item => {
+    return {
+      licenceGaugingStationId: item.licenceGaugingStationId,
+      licenceId: item.licenceId,
+      licenceRef: item.licenceRef,
+      alertType: item.alertType,
+      thresholdValue: item.thresholdValue,
+      thresholdUnit: humaniseUnits(item.thresholdUnit)
+    };
+  });
+
+  const checkBoxSelection = session.get(request).selectedCondition.value;
+  const output = chain(dataFormatted).groupBy('licenceId').map(value => ({
+    licenceRef: value[0].licenceRef,
+    licenceId: value[0].licenceId,
+    linkages: value.length <= 0 ? [] : value.filter(itemInLinkages => isSelectedCheckbox(itemInLinkages.licenceGaugingStationId, checkBoxSelection))
+  })).value();
+
+  return output.filter(chkItem => chkItem.linkages.length > 0);
+};
+
+const addCheckboxFields = dataWithoutDistinct => {
+  return dataWithoutDistinct.map(itemWithoutDistinct => {
+    return {
+      licenceGaugingStationId: itemWithoutDistinct.licenceGaugingStationId,
+      licenceId: itemWithoutDistinct.licenceId,
+      licenceRef: itemWithoutDistinct.licenceRef,
+      value: itemWithoutDistinct.licenceGaugingStationId,
+      label: ` ${humaniseAlertType(itemWithoutDistinct.alertType)} at ${itemWithoutDistinct.thresholdValue} ${humaniseUnits(itemWithoutDistinct.thresholdUnit)}`,
+      hint: itemWithoutDistinct.licenceRef,
+      alertType: itemWithoutDistinct.alertType,
+      thresholdValue: itemWithoutDistinct.thresholdValue,
+      thresholdUnit: humaniseUnits(itemWithoutDistinct.thresholdUnit),
+      dupeMax: itemWithoutDistinct.dupeMax
+    };
+  });
+};
+
+const groupLicenceConditions = request => {
+  const { licenceGaugingStations } = request.pre;
+  const { data } = licenceGaugingStations;
+
+  const dataFormatted = data.map(item => {
+    return {
+      licenceGaugingStationId: item.licenceGaugingStationId,
+      licenceId: item.licenceId,
+      licenceRef: item.licenceRef,
+      alertType: item.alertType,
+      thresholdValue: item.thresholdValue,
+      thresholdUnit: item.thresholdUnit
+    };
+  });
+
+  const output = chain(dataFormatted).groupBy('licenceId').map(value => ({
+    licenceRef: value[0].licenceRef,
+    licenceId: value[0].licenceId,
+    licenceGaugingStationId: value[0].licenceGaugingStationId,
+    alertType: value[0].alertType,
+    thresholdValue: value[0].thresholdValue,
+    thresholdUnit: value[0].thresholdUnit,
+    linkages: value
+  })).value();
+
+  return output.map(item => {
+    return {
+      licenceGaugingStationId: item.licenceGaugingStationId,
+      licenceId: item.licenceId,
+      licenceRef: item.licenceRef,
+      alertType: item.alertType,
+      thresholdValue: item.thresholdValue,
+      thresholdUnit: item.thresholdUnit,
+      dupeNum: item.linkages ? 1 : item.linkages.length,
+      linkages: addCheckboxFields(item.linkages)
+    };
+  });
+};
+
 exports.blankGuid = blankGuid;
 exports.createTitle = createTitle;
 exports.redirectTo = redirectTo;
@@ -145,3 +266,9 @@ exports.getCaption = getCaption;
 exports.getSelectedConditionText = getSelectedConditionText;
 exports.groupByLicence = groupByLicence;
 exports.handlePost = handlePost;
+exports.handleRemovePost = handleRemovePost;
+exports.humaniseAlertType = humaniseAlertType;
+exports.humaniseUnits = humaniseUnits;
+exports.detailedLabel = detailedLabel;
+exports.selectedConditionWithLinkages = selectedConditionWithLinkages;
+exports.groupLicenceConditions = groupLicenceConditions;
